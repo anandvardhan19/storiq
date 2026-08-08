@@ -1,34 +1,28 @@
 import { PrismaClient } from '@prisma/client'
+import { PrismaD1 } from '@prisma/adapter-d1'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 
 let _localClient: PrismaClient | undefined
 
 function getClient(): PrismaClient {
-  // Cloudflare Workers environment — D1 adapter per request
+  // Cloudflare Workers environment — use D1 adapter per request
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getCloudflareContext } = require('@opennextjs/cloudflare')
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { PrismaD1 } = require('@prisma/adapter-d1')
     const { env } = getCloudflareContext()
     if (env?.DB) {
-      return new PrismaClient({ adapter: new PrismaD1(env.DB) })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return new PrismaClient({ adapter: new PrismaD1(env.DB as any) })
     }
   } catch {
-    // Not in Cloudflare environment — fall through to local
+    // Not in Cloudflare — fall through to local dev
   }
 
-  // Local dev — reuse singleton to avoid "too many clients" warning
+  // Local dev — reuse singleton (native library engine via DATABASE_URL)
   if (!_localClient) {
-    _localClient = new PrismaClient({
-      log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-    })
+    _localClient = new PrismaClient()
   }
   return _localClient
 }
 
-// Proxy so all existing `db.user.findMany()` calls work unchanged.
-// On Cloudflare each property access fetches a fresh D1-backed client.
-// Locally it always returns the same singleton.
 export const db = new Proxy({} as PrismaClient, {
   get(_, prop: string | symbol) {
     return (getClient() as unknown as Record<string | symbol, unknown>)[prop]
