@@ -38,8 +38,11 @@ jobs:
           NEXT_PUBLIC_APP_NAME: Storiq
           NEXT_PUBLIC_APP_URL: ${{ secrets.NEXTAUTH_URL }}
 
-      - name: Copy Worker to Pages assets
-        run: cp .open-next/worker.js .open-next/assets/_worker.js
+      - name: Copy Worker and dependencies to Pages assets
+        run: |
+          cp .open-next/worker.js .open-next/assets/_worker.js
+          cp -r .open-next/cloudflare .open-next/assets/cloudflare
+          cp -r .open-next/middleware .open-next/assets/middleware
         working-directory: platform
 
       - name: Deploy to Cloudflare Pages
