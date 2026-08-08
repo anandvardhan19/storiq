@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   const run = await db.agentRun.create({
     data: {
-      agentsRun: Array.from(new Set(tasks.map((t) => t.agent))),
+      agentsRun: JSON.stringify(Array.from(new Set(tasks.map((t) => t.agent)))),
       tasksTotal: tasks.length,
     },
   })
