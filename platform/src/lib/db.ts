@@ -1,6 +1,30 @@
 import { PrismaClient } from '@prisma/client'
 import { PrismaD1 } from '@prisma/adapter-d1'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
+import fsp from 'fs/promises'
+
+// unenv (bundled inside OpenNext for edge compat) stubs fs/promises.readdir as
+// "not implemented" — Prisma's libssl detection only ignores ENOENT, so it crashes.
+// Patch the shared module object so Prisma sees ENOENT instead.
+const _origReaddir = fsp.readdir as unknown as (...args: unknown[]) => Promise<unknown>
+;(fsp as unknown as Record<string, unknown>).readdir = async function patchedReaddir(
+  path: unknown,
+  ...rest: unknown[]
+) {
+  try {
+    return await _origReaddir(path, ...rest)
+  } catch (err: unknown) {
+    const msg = (err as Error).message ?? ''
+    if (msg.includes('not implemented') || msg.includes('ENOSYS')) {
+      const e = Object.assign(
+        new Error(`ENOENT: no such file or directory, scandir '${path}'`),
+        { code: 'ENOENT' }
+      )
+      throw e
+    }
+    throw err
+  }
+}
 
 let _localClient: PrismaClient | undefined
 
