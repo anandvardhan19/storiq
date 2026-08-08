@@ -7,7 +7,9 @@ main = ".open-next/worker.js"
 [[d1_databases]]
 binding = "DB"
 database_name = "storiq-db"
-database_id = "REPLACE_WITH_YOUR_D1_ID"
+database_id = "992fe55f-d182-4c36-9841-1e966af4a50b"
+migrations_dir = "prisma/migrations"
+migrations_pattern = "prisma/migrations/*/migration.sql"
 
 [vars]
 NEXT_PUBLIC_APP_NAME = "Storiq"
