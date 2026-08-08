@@ -1,0 +1,10 @@
+.next
+node_modules
+.env.local
+.env*.local
+prisma/storiq.db
+prisma/migrations
+npm-debug.log*
+.git
+.gitignore
+README.md

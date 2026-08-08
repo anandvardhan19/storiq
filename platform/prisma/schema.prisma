@@ -1,0 +1,478 @@
+// Chhayavastralaya — SMB Commerce Platform
+// Prisma Schema v0.2 — SQLite
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// AUTH & MULTI-TENANCY
+// ─────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  phone        String?
+  avatar       String?
+  role         String   @default("OWNER") // OWNER | MANAGER | CASHIER | WAREHOUSE_STAFF | VIEWER
+  storeId      String?
+  store        Store?   @relation(fields: [storeId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  staffProfile StaffMember?
+  sessions     Session[]
+  auditLogs    AuditLog[]
+
+  @@index([email])
+  @@index([storeId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([token])
+}
+
+// ─────────────────────────────────────────────
+// STORE
+// ─────────────────────────────────────────────
+
+model Store {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String?
+  logo        String?
+  phone       String?
+  email       String?
+  address     String? // JSON: { line1, line2, city, state, pincode }
+  currency    String  @default("INR")
+  timezone    String  @default("Asia/Kolkata")
+  plan        String  @default("FREE") // FREE | PRO | BUSINESS
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users      User[]
+  products   Product[]
+  categories Category[]
+  orders     Order[]
+  staff      StaffMember[]
+  customers  Customer[]
+  suppliers  Supplier[]
+  warehouses Warehouse[]
+  discounts  Discount[]
+  settings   StoreSettings?
+
+  @@index([slug])
+}
+
+model StoreSettings {
+  id                    String  @id @default(cuid())
+  storeId               String  @unique
+  store                 Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  lowStockThreshold     Int     @default(10)
+  autoReorderEnabled    Boolean @default(false)
+  taxRate               Float   @default(18.0)
+  invoicePrefix         String  @default("INV")
+  receiptMessage        String?
+  whatsappNotifications Boolean @default(true)
+  emailNotifications    Boolean @default(true)
+  // Backup settings
+  autoBackupEnabled     Boolean @default(false)
+  autoBackupType        String  @default("local") // "local" | "gdrive"
+  autoBackupIntervalDays Int    @default(1)
+  gdriveRefreshToken    String? // stored after Google Drive OAuth
+  lastBackupAt          DateTime?
+}
+
+// ─────────────────────────────────────────────
+// INVENTORY
+// ─────────────────────────────────────────────
+
+model Category {
+  id          String    @id @default(cuid())
+  storeId     String
+  store       Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String
+  description String?
+  imageUrl    String?
+  parentId    String?
+  parent      Category? @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  products    Product[]
+  createdAt   DateTime  @default(now())
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  storeId      String
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  categoryId   String?
+  category     Category? @relation(fields: [categoryId], references: [id])
+  supplierId   String?
+  supplier     Supplier? @relation(fields: [supplierId], references: [id])
+  name         String
+  slug         String
+  description  String?
+  sku          String?
+  barcode      String?
+  imageUrls    String   @default("[]") // JSON array
+  costPrice    Float    @default(0)
+  sellingPrice Float
+  mrp          Float?
+  taxRate      Float    @default(18.0)
+  unit         String   @default("piece")
+  isActive     Boolean  @default(true)
+  isFeatured   Boolean  @default(false)
+  tags         String   @default("[]") // JSON array
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  variants   ProductVariant[]
+  inventory  InventoryItem[]
+  orderItems OrderItem[]
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+  @@index([barcode])
+}
+
+model ProductVariant {
+  id           String   @id @default(cuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name         String
+  sku          String?
+  barcode      String?
+  costPrice    Float?
+  sellingPrice Float?
+  attributes   String   @default("{}") // JSON: { color, size, ... }
+  imageUrl     String?
+  isActive     Boolean  @default(true)
+
+  inventory  InventoryItem[]
+  orderItems OrderItem[]
+
+  @@index([productId])
+}
+
+model Warehouse {
+  id        String          @id @default(cuid())
+  storeId   String
+  store     Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name      String
+  address   String?         // JSON
+  isDefault Boolean         @default(false)
+  inventory InventoryItem[]
+
+  @@index([storeId])
+}
+
+model InventoryItem {
+  id               String          @id @default(cuid())
+  productId        String
+  product          Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId        String?
+  variant          ProductVariant? @relation(fields: [variantId], references: [id])
+  warehouseId      String
+  warehouse        Warehouse       @relation(fields: [warehouseId], references: [id])
+  quantity         Int             @default(0)
+  reservedQuantity Int             @default(0)
+  reorderPoint     Int             @default(10)
+  reorderQuantity  Int             @default(50)
+  lastRestockedAt  DateTime?
+  updatedAt        DateTime        @updatedAt
+
+  movements StockMovement[]
+
+  @@unique([productId, variantId, warehouseId])
+  @@index([productId])
+  @@index([warehouseId])
+}
+
+model StockMovement {
+  id              String   @id @default(cuid())
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  type            String   // PURCHASE | SALE | RETURN | ADJUSTMENT | DAMAGE | TRANSFER
+  quantity        Int
+  reference       String?
+  note            String?
+  createdAt       DateTime @default(now())
+  createdById     String?
+
+  @@index([inventoryItemId])
+}
+
+model Supplier {
+  id        String    @id @default(cuid())
+  storeId   String
+  store     Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name      String
+  email     String?
+  phone     String?
+  address   String?   // JSON
+  gstin     String?
+  products  Product[]
+  createdAt DateTime  @default(now())
+
+  @@index([storeId])
+}
+
+// ─────────────────────────────────────────────
+// ORDERS & SALES
+// ─────────────────────────────────────────────
+
+model Customer {
+  id         String   @id @default(cuid())
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name       String
+  email      String?
+  phone      String?
+  address    String?  // JSON
+  gstin      String?
+  loyaltyPts Int      @default(0)
+  totalSpent Float    @default(0)
+  orderCount Int      @default(0)
+  tags       String   @default("[]") // JSON array
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  orders  Order[]
+  reviews Review[]
+
+  @@index([storeId])
+  @@index([phone])
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  storeId       String
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  orderNumber   String   @unique
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  status        String   @default("PENDING") // PENDING | CONFIRMED | PROCESSING | SHIPPED | DELIVERED | CANCELLED | REFUNDED
+  paymentStatus String   @default("PENDING") // PENDING | PARTIAL | PAID | REFUNDED | FAILED
+  paymentMethod String?
+  subtotal      Float
+  discountAmt   Float    @default(0)
+  taxAmt        Float    @default(0)
+  shippingAmt   Float    @default(0)
+  total         Float
+  notes         String?
+  shippingAddr  String?  // JSON
+  discountId    String?
+  discount      Discount? @relation(fields: [discountId], references: [id])
+  staffId       String?
+  staff         StaffMember? @relation(fields: [staffId], references: [id])
+  source        String   @default("POS") // POS | ONLINE | WHATSAPP | PHONE
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items        OrderItem[]
+  payments     Payment[]
+  fulfillments Fulfillment[]
+
+  @@index([storeId])
+  @@index([customerId])
+  @@index([orderNumber])
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  variantId   String?
+  variant     ProductVariant? @relation(fields: [variantId], references: [id])
+  productName String
+  variantName String?
+  sku         String?
+  quantity    Int
+  unitPrice   Float
+  taxRate     Float    @default(0)
+  taxAmt      Float    @default(0)
+  discountAmt Float    @default(0)
+  total       Float
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount      Float
+  method      String
+  status      String   @default("PENDING") // PENDING | PARTIAL | PAID | REFUNDED | FAILED
+  gatewayRef  String?
+  gatewayData String?  // JSON
+  paidAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model Fulfillment {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status      String   @default("PENDING") // PENDING | PACKED | SHIPPED | OUT_FOR_DELIVERY | DELIVERED | RETURNED
+  trackingNo  String?
+  courier     String?
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model Discount {
+  id            String   @id @default(cuid())
+  storeId       String
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  code          String
+  type          String   // PERCENTAGE | FLAT
+  value         Float
+  minOrderValue Float?
+  maxUses       Int?
+  usedCount     Int      @default(0)
+  startsAt      DateTime?
+  expiresAt     DateTime?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  orders Order[]
+
+  @@unique([storeId, code])
+  @@index([storeId])
+}
+
+// ─────────────────────────────────────────────
+// STAFF
+// ─────────────────────────────────────────────
+
+model StaffMember {
+  id          String   @id @default(cuid())
+  storeId     String
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  employeeId  String?
+  designation String?
+  department  String?
+  salary      Float?
+  joinedAt    DateTime?
+  isActive    Boolean  @default(true)
+
+  orders     Order[]
+  attendance Attendance[]
+  shifts     ShiftAssignment[]
+
+  @@index([storeId])
+}
+
+model Shift {
+  id          String            @id @default(cuid())
+  storeId     String
+  name        String
+  startTime   String
+  endTime     String
+  assignments ShiftAssignment[]
+
+  @@index([storeId])
+}
+
+model ShiftAssignment {
+  id        String      @id @default(cuid())
+  staffId   String
+  staff     StaffMember @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  shiftId   String
+  shift     Shift       @relation(fields: [shiftId], references: [id])
+  date      DateTime
+  createdAt DateTime    @default(now())
+
+  @@unique([staffId, date])
+  @@index([staffId])
+}
+
+model Attendance {
+  id        String      @id @default(cuid())
+  staffId   String
+  staff     StaffMember @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  date      DateTime
+  checkIn   DateTime?
+  checkOut  DateTime?
+  status    String      @default("PRESENT") // PRESENT | ABSENT | HALF_DAY | LEAVE | HOLIDAY
+  note      String?
+
+  @@unique([staffId, date])
+  @@index([staffId])
+}
+
+// ─────────────────────────────────────────────
+// MISC
+// ─────────────────────────────────────────────
+
+model Review {
+  id         String   @id @default(cuid())
+  storeId    String
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  rating     Int
+  comment    String?
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([storeId])
+}
+
+model BackupLog {
+  id        String   @id @default(cuid())
+  type      String   // "local" | "gdrive"
+  filename  String
+  sizeBytes Int
+  status    String   @default("success") // "success" | "failed"
+  gdriveId  String?
+  errorMsg  String?
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  storeId    String
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entityType String
+  entityId   String
+  metadata   String?  // JSON
+  createdAt  DateTime @default(now())
+
+  @@index([storeId])
+  @@index([entityType, entityId])
+}

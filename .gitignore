@@ -1,0 +1,34 @@
+# deps
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+platform/.next/
+platform/out/
+
+# env files — never commit secrets
+platform/.env.local
+platform/.env*.local
+
+# Database files — never commit
+platform/prisma/**/*.db
+platform/prisma/**/*.db-journal
+platform/prisma/**/*.db-shm
+platform/prisma/**/*.db-wal
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project workspace files (not part of the app)
+STATUS_REPORT_*.md
+SECURITY_AUDIT.md
+*.docx
+*.png
+.claude/
+agents/
+brainstorm*.md
+
+# build
+platform/tsconfig.tsbuildinfo
