@@ -1,0 +1,13 @@
+name = "storiq"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".open-next/assets"
+main = ".open-next/worker.js"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "storiq-db"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+
+[vars]
+NEXT_PUBLIC_APP_NAME = "Storiq"

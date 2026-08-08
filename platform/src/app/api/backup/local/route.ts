@@ -1,28 +1,50 @@
 import { NextResponse } from 'next/server'
-import { readFileSync, statSync, existsSync } from 'fs'
-import path from 'path'
 import { db } from '@/lib/db'
 
-const DB_PATH = path.resolve(process.cwd(), 'prisma/storiq.db')
-
 export async function GET() {
-  if (!existsSync(DB_PATH)) {
-    return NextResponse.json({ error: 'Database file not found' }, { status: 404 })
+  const [stores, users, products, categories, customers, orders, orderItems,
+    staff, attendance, suppliers, warehouses, inventory, payments,
+    fulfillments, discounts, reviews] = await Promise.all([
+    db.store.findMany(),
+    db.user.findMany({ select: { id: true, email: true, name: true, role: true, storeId: true, createdAt: true } }),
+    db.product.findMany(),
+    db.category.findMany(),
+    db.customer.findMany(),
+    db.order.findMany(),
+    db.orderItem.findMany(),
+    db.staffMember.findMany(),
+    db.attendance.findMany(),
+    db.supplier.findMany(),
+    db.warehouse.findMany(),
+    db.inventoryItem.findMany(),
+    db.payment.findMany(),
+    db.fulfillment.findMany(),
+    db.discount.findMany(),
+    db.review.findMany(),
+  ])
+
+  const backup = {
+    version: '1.0',
+    exportedAt: new Date().toISOString(),
+    app: 'Storiq',
+    data: {
+      stores, users, products, categories, customers, orders, orderItems,
+      staff, attendance, suppliers, warehouses, inventory, payments,
+      fulfillments, discounts, reviews,
+    },
   }
 
-  const stat = statSync(DB_PATH)
-  const buf = readFileSync(DB_PATH)
-  const filename = `storiq-backup-${new Date().toISOString().slice(0, 10)}.db`
+  const filename = `storiq-backup-${new Date().toISOString().slice(0, 10)}.json`
+  const body = JSON.stringify(backup, null, 2)
 
   await db.backupLog.create({
-    data: { type: 'local', filename, sizeBytes: stat.size, status: 'success' },
+    data: { type: 'local', filename, sizeBytes: Buffer.byteLength(body), status: 'success' },
   })
 
-  return new NextResponse(buf, {
+  return new NextResponse(body, {
     headers: {
-      'Content-Type': 'application/octet-stream',
+      'Content-Type': 'application/json',
       'Content-Disposition': `attachment; filename="${filename}"`,
-      'Content-Length': String(stat.size),
     },
   })
 }

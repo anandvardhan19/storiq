@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
-import { readFileSync, statSync, existsSync } from 'fs'
 import { Readable } from 'stream'
-import path from 'path'
 import { db } from '@/lib/db'
 
-const DB_PATH = path.resolve(process.cwd(), 'prisma/storiq.db')
 const FOLDER_NAME = 'Storiq Backups'
 
 function getOAuth2Client() {
@@ -16,10 +13,9 @@ function getOAuth2Client() {
   )
 }
 
-// GET /api/backup/gdrive — start OAuth or trigger backup if token stored
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const action = searchParams.get('action') // 'auth' | 'run'
+  const action = searchParams.get('action')
 
   if (action === 'auth') {
     const oauth2 = getOAuth2Client()
@@ -31,16 +27,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // action === 'run' — use stored refresh token
   const settings = await db.storeSettings.findFirst()
   if (!settings?.gdriveRefreshToken) {
     return NextResponse.json({ error: 'Google Drive not connected. Visit /settings to connect.' }, { status: 400 })
   }
-
   return runBackup(settings.gdriveRefreshToken)
 }
 
-// POST /api/backup/gdrive — trigger backup with provided refresh token
 export async function POST(req: NextRequest) {
   const { refreshToken } = await req.json()
   if (!refreshToken) return NextResponse.json({ error: 'refreshToken required' }, { status: 400 })
@@ -48,15 +41,28 @@ export async function POST(req: NextRequest) {
 }
 
 async function runBackup(refreshToken: string) {
-  if (!existsSync(DB_PATH)) {
-    return NextResponse.json({ error: 'Database file not found' }, { status: 404 })
-  }
+  // Export data as JSON (no filesystem needed — works on Cloudflare)
+  const [stores, users, products, categories, customers, orders, orderItems,
+    staff, attendance, suppliers, warehouses, inventory, payments,
+    fulfillments, discounts, reviews] = await Promise.all([
+    db.store.findMany(), db.user.findMany({ select: { id: true, email: true, name: true, role: true, storeId: true, createdAt: true } }),
+    db.product.findMany(), db.category.findMany(), db.customer.findMany(),
+    db.order.findMany(), db.orderItem.findMany(), db.staffMember.findMany(),
+    db.attendance.findMany(), db.supplier.findMany(), db.warehouse.findMany(),
+    db.inventoryItem.findMany(), db.payment.findMany(), db.fulfillment.findMany(),
+    db.discount.findMany(), db.review.findMany(),
+  ])
+
+  const body = JSON.stringify({ version: '1.0', exportedAt: new Date().toISOString(), app: 'Storiq',
+    data: { stores, users, products, categories, customers, orders, orderItems, staff, attendance,
+      suppliers, warehouses, inventory, payments, fulfillments, discounts, reviews } }, null, 2)
+
+  const filename = `storiq-backup-${new Date().toISOString().slice(0, 10)}.json`
 
   const oauth2 = getOAuth2Client()
   oauth2.setCredentials({ refresh_token: refreshToken })
   const drive = google.drive({ version: 'v3', auth: oauth2 })
 
-  // Find or create the backup folder
   const folderRes = await drive.files.list({
     q: `name='${FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: 'files(id)',
@@ -70,27 +76,15 @@ async function runBackup(refreshToken: string) {
     folderId = created.data.id!
   }
 
-  const buf = readFileSync(DB_PATH)
-  const stat = statSync(DB_PATH)
-  const filename = `storiq-backup-${new Date().toISOString().slice(0, 10)}.db`
-
   const uploaded = await drive.files.create({
     requestBody: { name: filename, parents: [folderId] },
-    media: { mimeType: 'application/octet-stream', body: Readable.from(buf) },
-    fields: 'id,name,size',
+    media: { mimeType: 'application/json', body: Readable.from(Buffer.from(body)) },
+    fields: 'id,name',
   })
 
   await db.backupLog.create({
-    data: {
-      type: 'gdrive',
-      filename,
-      sizeBytes: stat.size,
-      status: 'success',
-      gdriveId: uploaded.data.id ?? null,
-    },
+    data: { type: 'gdrive', filename, sizeBytes: Buffer.byteLength(body), status: 'success', gdriveId: uploaded.data.id ?? null },
   })
-
-  // Update lastBackupAt in settings
   await db.storeSettings.updateMany({ data: { lastBackupAt: new Date() } })
 
   return NextResponse.json({ ok: true, filename, gdriveId: uploaded.data.id })
