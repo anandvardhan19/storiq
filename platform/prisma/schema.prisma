@@ -463,6 +463,41 @@ model BackupLog {
   createdAt DateTime @default(now())
 }
 
+// ─────────────────────────────────────────────
+// AI AGENTS
+// ─────────────────────────────────────────────
+
+model AgentTask {
+  id          String    @id @default(cuid())
+  agent       String    // e.g. "INVENTORY", "SALES", "CUSTOMER"
+  title       String
+  description String?
+  status      String    @default("TODO") // TODO | IN_PROGRESS | DONE | FAILED | SKIPPED
+  priority    String    @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  result      String?
+  errorMsg    String?
+  tokensUsed  Int?
+  durationMs  Int?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([agent])
+}
+
+model AgentRun {
+  id          String    @id @default(cuid())
+  agentsRun   String    // JSON array of agent names
+  tasksTotal  Int       @default(0)
+  tasksDone   Int       @default(0)
+  tasksFailed Int       @default(0)
+  durationMs  Int?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+}
+
 model AuditLog {
   id         String   @id @default(cuid())
   storeId    String
