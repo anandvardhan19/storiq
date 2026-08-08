@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { google } from 'googleapis'
-import { Readable } from 'stream'
+import { auth, drive } from '@googleapis/drive'
 import { db } from '@/lib/db'
 
 const FOLDER_NAME = 'Storiq Backups'
 
 function getOAuth2Client() {
-  return new google.auth.OAuth2(
+  return new auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
     `${process.env.NEXTAUTH_URL}/api/backup/gdrive/callback`
@@ -41,7 +40,6 @@ export async function POST(req: NextRequest) {
 }
 
 async function runBackup(refreshToken: string) {
-  // Export data as JSON (no filesystem needed — works on Cloudflare)
   const [stores, users, products, categories, customers, orders, orderItems,
     staff, attendance, suppliers, warehouses, inventory, payments,
     fulfillments, discounts, reviews] = await Promise.all([
@@ -61,24 +59,24 @@ async function runBackup(refreshToken: string) {
 
   const oauth2 = getOAuth2Client()
   oauth2.setCredentials({ refresh_token: refreshToken })
-  const drive = google.drive({ version: 'v3', auth: oauth2 })
+  const driveClient = drive({ version: 'v3', auth: oauth2 })
 
-  const folderRes = await drive.files.list({
+  const folderRes = await driveClient.files.list({
     q: `name='${FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: 'files(id)',
   })
   let folderId = folderRes.data.files?.[0]?.id
   if (!folderId) {
-    const created = await drive.files.create({
+    const created = await driveClient.files.create({
       requestBody: { name: FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' },
       fields: 'id',
     })
     folderId = created.data.id!
   }
 
-  const uploaded = await drive.files.create({
+  const uploaded = await driveClient.files.create({
     requestBody: { name: filename, parents: [folderId] },
-    media: { mimeType: 'application/json', body: Readable.from(Buffer.from(body)) },
+    media: { mimeType: 'application/json', body },
     fields: 'id,name',
   })
 

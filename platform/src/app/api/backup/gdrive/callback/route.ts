@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { google } from 'googleapis'
+import { auth } from '@googleapis/drive'
 import { db } from '@/lib/db'
 
 export async function GET(req: NextRequest) {
@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get('code')
   if (!code) return NextResponse.json({ error: 'No code' }, { status: 400 })
 
-  const oauth2 = new google.auth.OAuth2(
+  const oauth2 = new auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
     `${process.env.NEXTAUTH_URL}/api/backup/gdrive/callback`
