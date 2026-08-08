@@ -32,3 +32,4 @@ brainstorm*.md
 
 # build
 platform/tsconfig.tsbuildinfo
+platform/.open-next/
