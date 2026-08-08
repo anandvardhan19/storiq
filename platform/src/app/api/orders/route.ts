@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
 
   const where = {
     storeId: session!.user.storeId!,
-    ...(status && { status: status as import('@prisma/client').OrderStatus }),
+    ...(status && { status: status as string }),
     ...(search && {
       OR: [
         { orderNumber: { contains: search, mode: 'insensitive' as const } },

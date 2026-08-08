@@ -25,9 +25,9 @@ export async function GET(req: NextRequest) {
     storeId: session!.user.storeId!,
     ...(search && {
       OR: [
-        { name: { contains: search, mode: 'insensitive' as const } },
+        { name: { contains: search } },
         { phone: { contains: search } },
-        { email: { contains: search, mode: 'insensitive' as const } },
+        { email: { contains: search } },
       ],
     }),
   }
@@ -65,7 +65,9 @@ export async function POST(req: NextRequest) {
     const data = createSchema.parse(body)
     const storeId = session!.user.storeId!
 
-    const customer = await db.customer.create({ data: { ...data, storeId } })
+    const customer = await db.customer.create({
+      data: { ...data, storeId, tags: JSON.stringify(data.tags) },
+    })
     return NextResponse.json(customer, { status: 201 })
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.errors }, { status: 400 })

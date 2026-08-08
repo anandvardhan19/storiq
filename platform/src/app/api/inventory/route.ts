@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       product: {
         storeId: session!.user.storeId!,
         isActive: true,
-        ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
+        ...(search && { name: { contains: search } }),
       },
       ...(warehouseId && { warehouseId }),
     },

@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   const where = {
     storeId: session!.user.storeId!,
     isActive: sp.get('inactive') ? undefined : true,
-    ...(search && { name: { contains: search, mode: 'insensitive' as const } }),
+    ...(search && { name: { contains: search } }),
     ...(categoryId && { categoryId }),
   }
 
@@ -68,7 +68,13 @@ export async function POST(req: NextRequest) {
     const slug = slugify(data.name) + '-' + Math.random().toString(36).substring(2, 6)
 
     const product = await db.product.create({
-      data: { ...data, storeId, slug },
+      data: {
+        ...data,
+        storeId,
+        slug,
+        tags: JSON.stringify(data.tags),
+        imageUrls: JSON.stringify(data.imageUrls),
+      },
       include: {
         category: { select: { id: true, name: true } },
         supplier: { select: { id: true, name: true } },

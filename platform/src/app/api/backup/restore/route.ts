@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
       // Re-insert
       if (data.stores?.length)      await tx.store.createMany({ data: data.stores as never[] })
-      if (data.users?.length)        await tx.user.createMany({ data: data.users as never[], skipDuplicates: true })
+      if (data.users?.length)        await tx.user.createMany({ data: data.users as never[] })
       if (data.customers?.length)    await tx.customer.createMany({ data: data.customers as never[] })
       if (data.suppliers?.length)    await tx.supplier.createMany({ data: data.suppliers as never[] })
       if (data.warehouses?.length)   await tx.warehouse.createMany({ data: data.warehouses as never[] })

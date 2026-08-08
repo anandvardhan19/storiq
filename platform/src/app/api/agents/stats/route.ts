@@ -24,7 +24,7 @@ export async function GET() {
     }),
 
     db.agentRun.findMany({
-      orderBy: { startedAt: 'desc' },
+      orderBy: { createdAt: 'desc' },
       take: 10,
     }),
 

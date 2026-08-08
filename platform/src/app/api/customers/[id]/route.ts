@@ -57,7 +57,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const body = await req.json()
     const data = updateSchema.parse(body)
-    const customer = await db.customer.update({ where: { id }, data })
+    const customer = await db.customer.update({
+      where: { id },
+      data: { ...data, tags: data.tags !== undefined ? JSON.stringify(data.tags) : undefined },
+    })
     return NextResponse.json(customer)
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.errors }, { status: 400 })

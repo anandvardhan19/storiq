@@ -55,7 +55,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const body = await req.json()
     const data = updateSchema.parse(body)
-    const product = await db.product.update({ where: { id }, data })
+    const product = await db.product.update({
+      where: { id },
+      data: {
+        ...data,
+        categoryId: data.categoryId === null ? null : data.categoryId,
+        supplierId: data.supplierId === null ? null : data.supplierId,
+        tags: data.tags !== undefined ? JSON.stringify(data.tags) : undefined,
+        imageUrls: data.imageUrls !== undefined ? JSON.stringify(data.imageUrls) : undefined,
+      },
+    })
     return NextResponse.json(product)
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.errors }, { status: 400 })
