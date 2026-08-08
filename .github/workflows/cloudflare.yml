@@ -38,15 +38,19 @@ jobs:
           NEXT_PUBLIC_APP_NAME: Storiq
           NEXT_PUBLIC_APP_URL: ${{ secrets.NEXTAUTH_URL }}
 
-      - name: Copy Worker and dependencies to Pages assets
+      - name: Assemble Pages deployment directory
         run: |
-          cp .open-next/worker.js .open-next/assets/_worker.js
-          cp -r .open-next/cloudflare .open-next/assets/cloudflare
-          cp -r .open-next/middleware .open-next/assets/middleware
+          mkdir -p .deploy
+          cp -r .open-next/assets/. .deploy/
+          cp .open-next/worker.js .deploy/_worker.js
+          cp -r .open-next/.build .deploy/.build
+          cp -r .open-next/cloudflare .deploy/cloudflare
+          cp -r .open-next/middleware .deploy/middleware
+          cp -r .open-next/server-functions .deploy/server-functions
         working-directory: platform
 
       - name: Deploy to Cloudflare Pages
-        run: npx wrangler pages deploy .open-next/assets --project-name storiq
+        run: npx wrangler pages deploy .deploy --project-name storiq
         working-directory: platform
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
