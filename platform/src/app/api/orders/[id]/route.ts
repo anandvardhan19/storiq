@@ -11,12 +11,13 @@ const updateSchema = z.object({
   shippingAddr: z.any().optional(),
 })
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { session, error } = await getSessionOrUnauth()
   if (error) return error
 
   const order = await db.order.findFirst({
-    where: { id: params.id, storeId: session!.user.storeId! },
+    where: { id, storeId: session!.user.storeId! },
     include: {
       items: {
         include: {
@@ -36,19 +37,20 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json(order)
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { session, error } = await getSessionOrUnauth()
   if (error) return error
 
   const existing = await db.order.findFirst({
-    where: { id: params.id, storeId: session!.user.storeId! },
+    where: { id, storeId: session!.user.storeId! },
   })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   try {
     const body = await req.json()
     const data = updateSchema.parse(body)
-    const order = await db.order.update({ where: { id: params.id }, data })
+    const order = await db.order.update({ where: { id }, data })
     return NextResponse.json(order)
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.errors }, { status: 400 })
@@ -57,17 +59,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { session, error } = await getSessionOrUnauth()
   if (error) return error
 
   const existing = await db.order.findFirst({
-    where: { id: params.id, storeId: session!.user.storeId! },
+    where: { id, storeId: session!.user.storeId! },
   })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   await db.order.update({
-    where: { id: params.id },
+    where: { id },
     data: { status: 'CANCELLED' },
   })
   return NextResponse.json({ success: true })

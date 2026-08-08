@@ -14,7 +14,8 @@ const updateSchema = z.object({
   durationMs: z.number().optional(),
 })
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { session, error } = await getSessionOrUnauth()
   if (error) return error
 
@@ -31,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (data.status === 'DONE' || data.status === 'FAILED') extra.completedAt = new Date()
 
     const task = await db.agentTask.update({
-      where: { id: params.id },
+      where: { id },
       data: { ...data, ...extra },
     })
     return NextResponse.json(task)
@@ -42,7 +43,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { session, error } = await getSessionOrUnauth()
   if (error) return error
 
@@ -50,6 +52,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  await db.agentTask.delete({ where: { id: params.id } })
+  await db.agentTask.delete({ where: { id } })
   return NextResponse.json({ success: true })
 }

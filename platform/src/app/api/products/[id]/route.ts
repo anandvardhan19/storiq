@@ -25,12 +25,13 @@ async function getProduct(id: string, storeId: string) {
   return db.product.findFirst({ where: { id, storeId } })
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { session, error } = await getSessionOrUnauth()
   if (error) return error
 
   const product = await db.product.findFirst({
-    where: { id: params.id, storeId: session!.user.storeId! },
+    where: { id, storeId: session!.user.storeId! },
     include: {
       category: true,
       supplier: true,
@@ -43,17 +44,18 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json(product)
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { session, error } = await getSessionOrUnauth()
   if (error) return error
 
-  const existing = await getProduct(params.id, session!.user.storeId!)
+  const existing = await getProduct(id, session!.user.storeId!)
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   try {
     const body = await req.json()
     const data = updateSchema.parse(body)
-    const product = await db.product.update({ where: { id: params.id }, data })
+    const product = await db.product.update({ where: { id }, data })
     return NextResponse.json(product)
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.errors }, { status: 400 })
@@ -62,14 +64,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { session, error } = await getSessionOrUnauth()
   if (error) return error
 
-  const existing = await getProduct(params.id, session!.user.storeId!)
+  const existing = await getProduct(id, session!.user.storeId!)
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Soft delete
-  await db.product.update({ where: { id: params.id }, data: { isActive: false } })
+  await db.product.update({ where: { id }, data: { isActive: false } })
   return NextResponse.json({ success: true })
 }

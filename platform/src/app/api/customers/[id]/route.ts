@@ -13,7 +13,8 @@ const updateSchema = z.object({
   notes: z.string().optional().nullable(),
 })
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { session, error } = await getSessionOrUnauth()
   if (error) return error
 
@@ -21,12 +22,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const { skip, take } = paginate(sp)
 
   const customer = await db.customer.findFirst({
-    where: { id: params.id, storeId: session!.user.storeId! },
+    where: { id, storeId: session!.user.storeId! },
   })
   if (!customer) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const orders = await db.order.findMany({
-    where: { customerId: params.id, storeId: session!.user.storeId! },
+    where: { customerId: id, storeId: session!.user.storeId! },
     skip,
     take,
     orderBy: { createdAt: 'desc' },
@@ -43,19 +44,20 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json({ ...customer, orders })
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { session, error } = await getSessionOrUnauth()
   if (error) return error
 
   const existing = await db.customer.findFirst({
-    where: { id: params.id, storeId: session!.user.storeId! },
+    where: { id, storeId: session!.user.storeId! },
   })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   try {
     const body = await req.json()
     const data = updateSchema.parse(body)
-    const customer = await db.customer.update({ where: { id: params.id }, data })
+    const customer = await db.customer.update({ where: { id }, data })
     return NextResponse.json(customer)
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: err.errors }, { status: 400 })
@@ -64,15 +66,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { session, error } = await getSessionOrUnauth()
   if (error) return error
 
   const existing = await db.customer.findFirst({
-    where: { id: params.id, storeId: session!.user.storeId! },
+    where: { id, storeId: session!.user.storeId! },
   })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  await db.customer.delete({ where: { id: params.id } })
+  await db.customer.delete({ where: { id } })
   return NextResponse.json({ success: true })
 }
