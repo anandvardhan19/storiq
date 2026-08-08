@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import bcrypt from 'bcryptjs'
-import { getCloudflareContext } from '@opennextjs/cloudflare'
 
 // One-time setup endpoint — disabled once an owner account exists
 export async function POST(req: NextRequest) {
@@ -53,19 +52,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  // Debug: check CF context before touching db
-  let cfDebug: Record<string, unknown> = {}
-  try {
-    const ctx = getCloudflareContext()
-    cfDebug = { hasCtx: true, envKeys: Object.keys(ctx?.env ?? {}), hasDB: !!ctx?.env?.DB }
-  } catch (e) {
-    cfDebug = { hasCtx: false, ctxError: String(e) }
-  }
-
-  try {
-    const existing = await db.user.findFirst({ where: { role: 'OWNER' } })
-    return NextResponse.json({ setupRequired: !existing, cfDebug })
-  } catch (e) {
-    return NextResponse.json({ error: String(e), cfDebug }, { status: 500 })
-  }
+  const existing = await db.user.findFirst({ where: { role: 'OWNER' } })
+  return NextResponse.json({ setupRequired: !existing })
 }
